@@ -2,6 +2,8 @@
 import { onMounted, ref } from "vue";
 import { supabase } from "./supabase.js";
 
+const hasInitData = ref("no");
+const platformText = ref("unknown");
 const tgReady = ref(false);
 const userText = ref("نامشخص");
 const telegramIdText = ref("unknown");
@@ -17,6 +19,8 @@ onMounted(() => {
 
   tg.ready();
   tg.expand();
+hasInitData.value = tg.initData && tg.initData.length > 0 ? "yes" : "no";
+platformText.value = tg.platform || "unknown";
 
   const user = tg.initDataUnsafe?.user;
 
@@ -89,6 +93,9 @@ async function submitForm(e) {
       <p><b>✅ داخل تلگرام اجرا شد</b></p>
       <p>کاربر: <b>{{ userText }}</b></p>
       <p>Telegram ID: <b>{{ telegramIdText }}</b></p>
+      <p>Has initData: <b>{{ hasInitData }}</b></p>
+    <p>Platform: <b>{{ platformText }}</b></p>
+
     </div>
 
     <hr style="margin: 16px 0;" />
