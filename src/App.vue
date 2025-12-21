@@ -4,6 +4,7 @@ import { supabase } from "./supabase.js";
 
 const tgReady = ref(false);
 const userText = ref("نامشخص");
+const telegramIdText = ref("unknown");
 
 const requestType = ref("Apple ID");
 const description = ref("");
@@ -18,9 +19,12 @@ onMounted(() => {
   tg.expand();
 
   const user = tg.initDataUnsafe?.user;
+
+  telegramIdText.value = user?.id ? String(user.id) : "unknown";
   if (user) {
     userText.value = user.username ? `@${user.username}` : (user.first_name || "User");
   }
+
   tgReady.value = true;
 });
 
@@ -29,7 +33,8 @@ async function submitForm(e) {
   resultText.value = "";
 
   const tg = window.Telegram?.WebApp;
-  const telegramId = tg?.initDataUnsafe?.user?.id ? String(tg.initDataUnsafe.user.id) : "unknown";
+  const user = tg?.initDataUnsafe?.user;
+  const telegramId = user?.id ? String(user.id) : "unknown";
 
   if (!description.value.trim()) {
     resultText.value = "❌ لطفاً توضیحات/متن خطا را وارد کنید.";
@@ -58,7 +63,7 @@ async function submitForm(e) {
 
     tg?.showPopup?.({
       title: "ثبت شد ✅",
-      message: `تیکت شما ثبت شد: #${data.id}`,
+      message: `تیکت شما ثبت شد: #${data.id}\nTelegram ID: ${telegramId}`,
       buttons: [{ type: "ok" }],
     });
   } catch (err) {
@@ -83,6 +88,7 @@ async function submitForm(e) {
     <div v-else style="padding: 12px; border: 1px solid #ddd; border-radius: 12px;">
       <p><b>✅ داخل تلگرام اجرا شد</b></p>
       <p>کاربر: <b>{{ userText }}</b></p>
+      <p>Telegram ID: <b>{{ telegramIdText }}</b></p>
     </div>
 
     <hr style="margin: 16px 0;" />
@@ -116,7 +122,6 @@ async function submitForm(e) {
         ></textarea>
       </label>
 
-      <!-- فعلاً فایل رو ذخیره نمی‌کنیم؛ مرحله بعد Storage می‌زنیم -->
       <label>
         آپلود فایل/اسکرین‌شات (فعلاً ذخیره نمی‌شود)
         <input type="file" style="width: 100%;" />
