@@ -5,11 +5,14 @@ import { supabase } from "./supabase.js";
 const hasInitData = ref("no");
 const platformText = ref("unknown");
 const tgReady = ref(false);
+
 const userText = ref("نامشخص");
 const telegramIdText = ref("unknown");
 
 const requestType = ref("Apple ID");
 const description = ref("");
+const selectedFile = ref(null);
+
 const isSubmitting = ref(false);
 const resultText = ref("");
 
@@ -19,8 +22,9 @@ onMounted(() => {
 
   tg.ready();
   tg.expand();
-hasInitData.value = tg.initData && tg.initData.length > 0 ? "yes" : "no";
-platformText.value = tg.platform || "unknown";
+
+  hasInitData.value = tg.initData && tg.initData.length > 0 ? "yes" : "no";
+  platformText.value = tg.platform || "unknown";
 
   const user = tg.initDataUnsafe?.user;
 
@@ -46,7 +50,30 @@ async function submitForm(e) {
   }
 
   isSubmitting.value = true;
+
   try {
+    // 1) آپلود فایل (اگر انتخاب شده باشد)
+    let filePath = null;
+    let fileName = null;
+
+    if (selectedFile.value) {
+      fileName = selectedFile.value.name;
+
+      // اسم فایل امن‌تر
+      const safeName = fileName.replace(/[^\w.\-]+/g, "_");
+      filePath = `${telegramId}/${Date.now()}_${safeName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("ticket-files")
+        .upload(filePath, selectedFile.value, {
+          cacheControl: "3600",
+          upsert: false,
+        });
+
+      if (uploadError) throw uploadError;
+    }
+
+    // 2) ثبت تیکت در دیتابیس + ذخیره مسیر فایل
     const { data, error } = await supabase
       .from("tickets")
       .insert([
@@ -55,6 +82,8 @@ async function submitForm(e) {
           request_type: requestType.value,
           description: description.value,
           status: "Pending",
+          file_path: filePath,
+          file_name: fileName,
         },
       ])
       .select("id")
@@ -64,6 +93,7 @@ async function submitForm(e) {
 
     resultText.value = `✅ تیکت ثبت شد. شماره تیکت: #${data.id}`;
     description.value = "";
+    selectedFile.value = null;
 
     tg?.showPopup?.({
       title: "ثبت شد ✅",
@@ -71,7 +101,7 @@ async function submitForm(e) {
       buttons: [{ type: "ok" }],
     });
   } catch (err) {
-    resultText.value = `❌ خطا در ثبت تیکت: ${err?.message || String(err)}`;
+    resultText.value = `❌ خطا: ${err?.message || String(err)}`;
   } finally {
     isSubmitting.value = false;
   }
@@ -84,9 +114,7 @@ async function submitForm(e) {
 
     <div v-if="!tgReady" style="padding: 12px; border: 1px solid #ddd; border-radius: 12px;">
       <p>این صفحه الان داخل مرورگر معمولی باز شده.</p>
-      <p style="opacity: 0.7;">
-        برای تست واقعی باید از داخل تلگرام به عنوان WebApp بازش کنیم.
-      </p>
+      <p style="opacity: 0.7;">برای تست واقعی باید از داخل تلگرام به عنوان WebApp بازش کنیم.</p>
     </div>
 
     <div v-else style="padding: 12px; border: 1px solid #ddd; border-radius: 12px;">
@@ -94,8 +122,7 @@ async function submitForm(e) {
       <p>کاربر: <b>{{ userText }}</b></p>
       <p>Telegram ID: <b>{{ telegramIdText }}</b></p>
       <p>Has initData: <b>{{ hasInitData }}</b></p>
-    <p>Platform: <b>{{ platformText }}</b></p>
-
+      <p>Platform: <b>{{ platformText }}</b></p>
     </div>
 
     <hr style="margin: 16px 0;" />
@@ -105,10 +132,7 @@ async function submitForm(e) {
     <form @submit="submitForm" style="display: grid; gap: 10px;">
       <label>
         نوع درخواست
-        <select
-          v-model="requestType"
-          style="width: 100%; padding: 10px; border-radius: 10px; border: 1px solid #ddd;"
-        >
+        <select v-model="requestType" style="width: 100%; padding: 10px; border-radius: 10px; border: 1px solid #ddd;">
           <option>Apple ID</option>
           <option>License/Credit</option>
           <option>Registration</option>
@@ -130,8 +154,12 @@ async function submitForm(e) {
       </label>
 
       <label>
-        آپلود فایل/اسکرین‌شات (فعلاً ذخیره نمی‌شود)
-        <input type="file" style="width: 100%;" />
+        آپلود فایل/اسکرین‌شات (واقعاً ذخیره می‌شود ✅)
+        <input
+          type="file"
+          style="width: 100%;"
+          @change="(e) => (selectedFile.value = e.target.files?.[0] || null)"
+        />
       </label>
 
       <button
