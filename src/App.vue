@@ -11,7 +11,9 @@ const telegramIdText = ref("unknown");
 
 const requestType = ref("Apple ID");
 const description = ref("");
+
 const selectedFile = ref(null);
+const selectedFileName = ref("");
 
 const isSubmitting = ref(false);
 const resultText = ref("");
@@ -27,8 +29,8 @@ onMounted(() => {
   platformText.value = tg.platform || "unknown";
 
   const user = tg.initDataUnsafe?.user;
-
   telegramIdText.value = user?.id ? String(user.id) : "unknown";
+
   if (user) {
     userText.value = user.username ? `@${user.username}` : (user.first_name || "User");
   }
@@ -57,9 +59,13 @@ async function submitForm(e) {
     let fileName = null;
 
     if (selectedFile.value) {
-      fileName = selectedFile.value.name;
+      fileName = selectedFile.value.name || "file";
 
-      // اسم فایل امن‌تر
+      const sizeMB = (selectedFile.value.size || 0) / (1024 * 1024);
+      if (sizeMB > 10) {
+        throw new Error("حجم فایل بیش از 10MB است. لطفاً فایل کوچک‌تر انتخاب کن.");
+      }
+
       const safeName = fileName.replace(/[^\w.\-]+/g, "_");
       filePath = `${telegramId}/${Date.now()}_${safeName}`;
 
@@ -68,9 +74,12 @@ async function submitForm(e) {
         .upload(filePath, selectedFile.value, {
           cacheControl: "3600",
           upsert: false,
+          contentType: selectedFile.value.type || undefined,
         });
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        throw new Error(`Upload failed: ${uploadError.message}`);
+      }
     }
 
     // 2) ثبت تیکت در دیتابیس + ذخیره مسیر فایل
@@ -94,10 +103,11 @@ async function submitForm(e) {
     resultText.value = `✅ تیکت ثبت شد. شماره تیکت: #${data.id}`;
     description.value = "";
     selectedFile.value = null;
+    selectedFileName.value = "";
 
     tg?.showPopup?.({
       title: "ثبت شد ✅",
-      message: `تیکت شما ثبت شد: #${data.id}\nTelegram ID: ${telegramId}`,
+      message: `تیکت شما ثبت شد: #${data.id}`,
       buttons: [{ type: "ok" }],
     });
   } catch (err) {
@@ -157,10 +167,15 @@ async function submitForm(e) {
         آپلود فایل/اسکرین‌شات (واقعاً ذخیره می‌شود ✅)
         <input
           type="file"
+          accept="image/*"
           style="width: 100%;"
-          @change="(e) => (selectedFile.value = e.target.files?.[0] || null)"
+          @change="(e) => { selectedFile.value = e.target.files?.[0] || null; selectedFileName.value = selectedFile.value?.name || ''; }"
         />
       </label>
+
+      <p v-if="selectedFileName" style="opacity: 0.85; margin: 0;">
+        فایل انتخاب شده: <b>{{ selectedFileName }}</b>
+      </p>
 
       <button
         type="submit"
