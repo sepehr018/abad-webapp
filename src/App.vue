@@ -12,9 +12,6 @@ const telegramIdText = ref("unknown");
 const requestType = ref("Apple ID");
 const description = ref("");
 
-const selectedFile = ref(null);
-const selectedFileName = ref("");
-
 const isSubmitting = ref(false);
 const resultText = ref("");
 
@@ -51,42 +48,9 @@ async function submitForm(e) {
     return;
   }
 
-  // ✅ فایل اجباری (برای دیباگ)
-  if (!selectedFile.value) {
-    resultText.value = "❌ فایل انتخاب نشده یا به اپ نرسیده. یک عکس انتخاب کن و دوباره تست کن.";
-    return;
-  }
-
   isSubmitting.value = true;
 
   try {
-    // 1) آپلود فایل
-    let filePath = null;
-    let fileName = null;
-
-    fileName = selectedFile.value.name || "file";
-
-    const sizeMB = (selectedFile.value.size || 0) / (1024 * 1024);
-    if (sizeMB > 10) {
-      throw new Error("حجم فایل بیش از 10MB است. لطفاً فایل کوچک‌تر انتخاب کن.");
-    }
-
-    const safeName = fileName.replace(/[^\w.\-]+/g, "_");
-    filePath = `${telegramId}/${Date.now()}_${safeName}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from("ticket-files")
-      .upload(filePath, selectedFile.value, {
-        cacheControl: "3600",
-        upsert: false,
-        contentType: selectedFile.value.type || undefined,
-      });
-
-    if (uploadError) {
-      throw new Error(`Upload failed: ${uploadError.message}`);
-    }
-
-    // 2) ثبت تیکت + ذخیره مسیر فایل
     const { data, error } = await supabase
       .from("tickets")
       .insert([
@@ -95,8 +59,6 @@ async function submitForm(e) {
           request_type: requestType.value,
           description: description.value,
           status: "Pending",
-          file_path: filePath,
-          file_name: fileName,
         },
       ])
       .select("id")
@@ -104,14 +66,15 @@ async function submitForm(e) {
 
     if (error) throw error;
 
-    resultText.value = `✅ تیکت ثبت شد. شماره تیکت: #${data.id}`;
+    resultText.value =
+      `✅ تیکت ثبت شد. شماره تیکت: #${data.id}\n` +
+      `📸 حالا اسکرین‌شات/عکس رو داخل چت ربات بفرست و روی عکس بنویس: #${data.id}`;
+
     description.value = "";
-    selectedFile.value = null;
-    selectedFileName.value = "";
 
     tg?.showPopup?.({
-      title: "ثبت شد ✅",
-      message: `تیکت شما ثبت شد: #${data.id}`,
+      title: "مرحله بعد ✅",
+      message: `تیکت #${data.id} ثبت شد.\nحالا عکس رو تو چت ربات بفرست و بنویس: #${data.id}`,
       buttons: [{ type: "ok" }],
     });
   } catch (err) {
@@ -170,22 +133,6 @@ async function submitForm(e) {
         ></textarea>
       </label>
 
-      <label>
-        آپلود فایل/اسکرین‌شات (واقعاً ذخیره می‌شود ✅)
-        <input
-          type="file"
-          accept="image/*"
-          style="width: 100%;"
-          @change="(e) => { selectedFile.value = e.target.files?.[0] || null; selectedFileName.value = selectedFile.value?.name || ''; }"
-        />
-      </label>
-
-      <p v-if="selectedFile" style="opacity: 0.85; margin: 0;">
-        فایل انتخاب شده: <b>{{ selectedFileName }}</b>
-        <br />
-        size: <b>{{ Math.round(selectedFile.size / 1024) }} KB</b> — type: <b>{{ selectedFile.type || "unknown" }}</b>
-      </p>
-
       <button
         type="submit"
         :disabled="isSubmitting"
@@ -194,9 +141,9 @@ async function submitForm(e) {
         {{ isSubmitting ? "در حال ثبت..." : "ثبت درخواست" }}
       </button>
 
-      <p v-if="resultText" style="margin-top: 12px; font-weight: 700;">
-        {{ resultText }}
-      </p>
+      <pre v-if="resultText" style="margin-top: 12px; font-weight: 700; white-space: pre-wrap;">
+{{ resultText }}
+      </pre>
     </form>
   </div>
 </template>
