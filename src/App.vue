@@ -51,38 +51,42 @@ async function submitForm(e) {
     return;
   }
 
+  // ✅ فایل اجباری (برای دیباگ)
+  if (!selectedFile.value) {
+    resultText.value = "❌ فایل انتخاب نشده یا به اپ نرسیده. یک عکس انتخاب کن و دوباره تست کن.";
+    return;
+  }
+
   isSubmitting.value = true;
 
   try {
-    // 1) آپلود فایل (اگر انتخاب شده باشد)
+    // 1) آپلود فایل
     let filePath = null;
     let fileName = null;
 
-    if (selectedFile.value) {
-      fileName = selectedFile.value.name || "file";
+    fileName = selectedFile.value.name || "file";
 
-      const sizeMB = (selectedFile.value.size || 0) / (1024 * 1024);
-      if (sizeMB > 10) {
-        throw new Error("حجم فایل بیش از 10MB است. لطفاً فایل کوچک‌تر انتخاب کن.");
-      }
-
-      const safeName = fileName.replace(/[^\w.\-]+/g, "_");
-      filePath = `${telegramId}/${Date.now()}_${safeName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from("ticket-files")
-        .upload(filePath, selectedFile.value, {
-          cacheControl: "3600",
-          upsert: false,
-          contentType: selectedFile.value.type || undefined,
-        });
-
-      if (uploadError) {
-        throw new Error(`Upload failed: ${uploadError.message}`);
-      }
+    const sizeMB = (selectedFile.value.size || 0) / (1024 * 1024);
+    if (sizeMB > 10) {
+      throw new Error("حجم فایل بیش از 10MB است. لطفاً فایل کوچک‌تر انتخاب کن.");
     }
 
-    // 2) ثبت تیکت در دیتابیس + ذخیره مسیر فایل
+    const safeName = fileName.replace(/[^\w.\-]+/g, "_");
+    filePath = `${telegramId}/${Date.now()}_${safeName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("ticket-files")
+      .upload(filePath, selectedFile.value, {
+        cacheControl: "3600",
+        upsert: false,
+        contentType: selectedFile.value.type || undefined,
+      });
+
+    if (uploadError) {
+      throw new Error(`Upload failed: ${uploadError.message}`);
+    }
+
+    // 2) ثبت تیکت + ذخیره مسیر فایل
     const { data, error } = await supabase
       .from("tickets")
       .insert([
@@ -142,7 +146,10 @@ async function submitForm(e) {
     <form @submit="submitForm" style="display: grid; gap: 10px;">
       <label>
         نوع درخواست
-        <select v-model="requestType" style="width: 100%; padding: 10px; border-radius: 10px; border: 1px solid #ddd;">
+        <select
+          v-model="requestType"
+          style="width: 100%; padding: 10px; border-radius: 10px; border: 1px solid #ddd;"
+        >
           <option>Apple ID</option>
           <option>License/Credit</option>
           <option>Registration</option>
@@ -173,8 +180,10 @@ async function submitForm(e) {
         />
       </label>
 
-      <p v-if="selectedFileName" style="opacity: 0.85; margin: 0;">
+      <p v-if="selectedFile" style="opacity: 0.85; margin: 0;">
         فایل انتخاب شده: <b>{{ selectedFileName }}</b>
+        <br />
+        size: <b>{{ Math.round(selectedFile.size / 1024) }} KB</b> — type: <b>{{ selectedFile.type || "unknown" }}</b>
       </p>
 
       <button
