@@ -1,7 +1,12 @@
 <script setup>
 import { onMounted, ref } from "vue";
 import { supabase } from "./supabase.js";
+import Admin from "./Admin.vue";
 
+// ✅ اگر url اینطوری بود => /?admin=1  پنل مدیریت نمایش داده میشه
+const isAdmin = new URLSearchParams(window.location.search).get("admin") === "1";
+
+// --- WebApp (ticket form) states ---
 const hasInitData = ref("no");
 const platformText = ref("unknown");
 const tgReady = ref(false);
@@ -16,6 +21,9 @@ const isSubmitting = ref(false);
 const resultText = ref("");
 
 onMounted(() => {
+  // اگر پنل ادمین هست، لازم نیست Telegram WebApp آماده کنیم
+  if (isAdmin) return;
+
   const tg = window.Telegram?.WebApp;
   if (!tg) return;
 
@@ -86,7 +94,11 @@ async function submitForm(e) {
 </script>
 
 <template>
-  <div style="font-family: sans-serif; padding: 16px; max-width: 640px; margin: 0 auto;">
+  <!-- ✅ Admin Panel -->
+  <Admin v-if="isAdmin" />
+
+  <!-- ✅ WebApp Ticket Form -->
+  <div v-else style="font-family: sans-serif; padding: 16px; max-width: 640px; margin: 0 auto;">
     <h2>📩 Abad WebApp</h2>
 
     <div v-if="!tgReady" style="padding: 12px; border: 1px solid #ddd; border-radius: 12px;">
